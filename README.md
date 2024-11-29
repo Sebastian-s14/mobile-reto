@@ -1,11 +1,157 @@
-# Sample Snack app
+# Reto Rimac Mobile
 
-Open the `App.js` file to start writing some code. You can preview the changes directly on your phone or tablet by scanning the **QR code** or use the iOS or Android emulators. When you're done, click **Save** and share the link!
+![alt text](image.png)
 
-When you're ready to see everything that Expo provides (or if you want to use your own editor) you can **Download** your project and use it with [expo cli](https://docs.expo.dev/get-started/installation/#expo-cli)).
+## Descripción
+Este proyecto esta desarrollado con React Native y Expo principalmente, muestra un lista de elementos con scroll infinito desde una api.
 
-All projects created in Snack are publicly available, so you can easily share the link to this project via link, or embed it on a web page with the `<>` button.
+## Requisitos
+- Node.js 20+
+- Visual Studio Code
+- Android Studio
 
-If you're having problems, you can tweet to us [@expo](https://twitter.com/expo) or ask in our [forums](https://forums.expo.dev/c/expo-dev-tools/61) or [Discord](https://chat.expo.dev/).
+## Instalar dependencias
+`npm install`
 
-Snack is Open Source. You can find the code on the [GitHub repo](https://github.com/expo/snack).
+## Iniciar proyecto
+`npm start`
+
+
+## Iniciar en Android
+`npm run android`
+
+## Iniciar en iOS
+`npm run ios`
+
+## Reto
+*Revisa el código a continuación e identifica los varios posibles problemas que podrían llevar a fallas, bloqueos o comportamientos ineficientes. Propone optimizaciones o correcciones donde sea necesario.*
+
+Se ha identificado los siguientes problemas y soluciones:
+- Importaciones innecesarias que causan que la aplicación no inicie.
+```javascript
+// Se comenta la importación de console ya que no es necesaria
+// import console from 'console';
+```
+- Actualizar la version de **"@expo/vector-icons"** ya que puede no ser compatible con la version del SDK de expo(51),
+```javascript
+// 14.0.2 => 14.0.3
+"@expo/vector-icons": "^14.0.3"
+```
+- Faltaba añadir await al response y se optimizón la función **fetchItems()**.
+```javascript
+// se agrega useCallback para evitar que se cree una nueva función cada vez que se renderiza el componente
+    const fetchItems = useCallback(async () => {
+        console.log('fetch data =====', page)
+        try {
+            const response = await fetch(
+                `https://rickandmortyapi.com/api/character?page=${page}`
+            )
+            // Se agrega await a la respuesta para esperar a que se resuelva la promesa
+            // const data = response.json();
+            const data = await response.json()
+
+            /**
+             * Se cambia setItems(data.results) por setItems((state) => [...state, ...data.results])
+             * para que se agreguen los nuevos elementos a los ya existentes
+             */
+            // setItems(data.results);
+            setItems((state) => [...state, ...data.results])
+        } catch (error) {
+            console.error('Error al obtener los elementos:', error)
+        } finally {
+            setLoading(false)
+        }
+    }, [page])
+```
+- Se modificó el **useEffect** para evitar renderizados innecesarios.
+```javascript
+useEffect(() => {
+        fetchItems()
+
+        // Se cambia [items] por [page] para que se ejecute fetchItems cada vez que cambie la página
+    }, [fetchItems, page])
+```
+- Se optimizó la función **renderItem**.
+```javascript
+/**
+     * Se cambia renderItem para que renderice un solo item
+     * Se agrega useCallback para evitar que se cree una nueva función cada vez que se renderiza el componente
+     */
+    const renderItem = useCallback(({ item }) => {
+        return (
+            <View
+                key={item.id}
+                style={styles.item}
+            >
+                <Text>
+                    {item.name}
+                </Text>
+            </View>
+        )
+    }, [])
+```
+- Se optimizó la lista de items, agregando SafeAreaView para que sea vea bien en todos los dispositivos y se agregó al componente **FlatList** la propiedad *initialNumToRender* y se separó el componente **ListFooter** y los estilos.
+```javascript
+/**
+     * Se agrega SafeAreaView para evitar que el contenido se superponga
+     * en algunos dispositivos con notch o barra de estado
+     */
+    return (
+        <SafeAreaView
+            style={styles.container}
+        >
+            <FlatList
+                data={items}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id}
+                initialNumToRender={15} // Se agrega initialNumToRender para renderizar los primeros 15 elementos
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={<ListFooter page={page} />}
+            />
+        </SafeAreaView>
+    )
+```
+- Se separaron los estilos
+```javascript
+// Se separan los estilos en un objeto para mejorar la legibilidad del código
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        /**
+         * Se agrega paddingTop para evitar que el contenido se superponga
+         * ya que SafeAreaView no funciona en Android
+         */
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    item: {
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ccc',
+    },
+    loader: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});
+```
+- Se separaron los componentes **ListFooter** y **Loader**.
+```javascript
+// Se separan los componentes Loader y ListFooter para mejorar la legibilidad del código
+export const Loader = () => {
+    return (
+        <View
+            style={styles.loader}
+        >
+            <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+    )
+}
+
+export const ListFooter = ({ page }) => {
+    if (page >= PAGE_LIMIT) return null
+    return <Button title="Cargar Más" />
+}
+
+```
